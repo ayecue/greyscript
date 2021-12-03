@@ -619,6 +619,43 @@ let collection = vscode.languages.createDiagnosticCollection("greyscript");
     context.subscriptions.push(gecmd)
 }
 
+function ReadPackage() {
+    try {
+        vscode.workspace.fs.readFile(new URL("package.json")).then(data => {
+            let text = TextDecoder("utf-8").decode(data);
+            let d = JSON.parse(text);
+            return d;
+        });
+    } catch(err) {
+        console.warn(`ReadPackage failed: ${err}`)
+        return false;
+    }
+}
+
+function Build(fallbackPath) {
+    let d = ReadPackage();
+    if (!d) throw "Failed to read packagefile!"
+    let outdir = d.output ? d.output : "/out/"
+    let mainfile = d.main ? d.main : fallbackPath;
+    if (!mainfile) throw "Invalid intro file!"
+    vscode.workspace.fs.readFile(new URL(mainfile)).then(async data => {
+        let output = TextDecoder("utf-8").decode(data);
+        let reg = /import_code\("([a-zA-Z0-9./]+)"\)/g
+        let m = output.matchAll(reg)
+        for (let i of m) {
+            let path = new URL(m[1]);
+            try {
+                await vscode.workspace.fs.readFile(path).then(fd => {
+                    output.replace(m[0], TextDecoder("utf-8").decode(fd));
+                });
+            } catch(err) {
+                throw `Failed to build imports: ${err}`
+            }
+        }
+        let outsplits = [];
+    });
+}
+
 function deactivate() {}
 
 module.exports = {activate, deactivate};
